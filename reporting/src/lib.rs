@@ -737,6 +737,8 @@ impl ReportingContract {
             .instance()
             .set(&symbol_short!("REPORTS"), &reports);
 
+        Self::update_storage_stats(&env);
+
         env.events().publish(
             (symbol_short!("report"), ReportEvent::ReportStored),
             (user, period_key),

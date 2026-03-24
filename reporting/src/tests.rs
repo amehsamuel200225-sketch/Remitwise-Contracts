@@ -849,12 +849,29 @@ fn test_storage_stats() {
     let report = client.get_financial_health_report(&user, &10000, &1704067200, &1706745600);
     client.store_report(&user, &report, &202401);
 
+    // After store_report, active_reports should be 1
+    let stats = client.get_storage_stats();
+    assert_eq!(stats.active_reports, 1);
+    assert_eq!(stats.archived_reports, 0);
+
+    // Overwrite the same report
+    client.store_report(&user, &report, &202401);
+    let stats = client.get_storage_stats();
+    assert_eq!(stats.active_reports, 1); // Should still be 1 after overwrite
+
     // Archive and check stats
     client.archive_old_reports(&admin, &2000000000);
 
     let stats = client.get_storage_stats();
     assert_eq!(stats.active_reports, 0);
     assert_eq!(stats.archived_reports, 1);
+
+    // Cleanup old archives
+    client.cleanup_old_reports(&admin, &2000000000);
+
+    let stats = client.get_storage_stats();
+    assert_eq!(stats.active_reports, 0);
+    assert_eq!(stats.archived_reports, 0);
 }
 
 #[test]

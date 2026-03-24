@@ -87,59 +87,8 @@ pub struct SavingsSchedule {
     pub missed_count: u32,
 }
 
-#[contracttype]
-#[derive(Clone, Copy)]
-pub enum SavingsGoalsError {
-    InvalidAmount = 1,
-    GoalNotFound = 2,
-    Unauthorized = 3,
-    GoalLocked = 4,
-    InsufficientBalance = 5,
-    Overflow = 6,
-}
 
-impl From<SavingsGoalsError> for soroban_sdk::Error {
-    fn from(err: SavingsGoalsError) -> Self {
-        match err {
-            SavingsGoalsError::InvalidAmount => soroban_sdk::Error::from((
-                soroban_sdk::xdr::ScErrorType::Contract,
-                soroban_sdk::xdr::ScErrorCode::InvalidInput,
-            )),
-            SavingsGoalsError::GoalNotFound => soroban_sdk::Error::from((
-                soroban_sdk::xdr::ScErrorType::Contract,
-                soroban_sdk::xdr::ScErrorCode::MissingValue,
-            )),
-            SavingsGoalsError::Unauthorized => soroban_sdk::Error::from((
-                soroban_sdk::xdr::ScErrorType::Contract,
-                soroban_sdk::xdr::ScErrorCode::InvalidAction,
-            )),
-            SavingsGoalsError::GoalLocked => soroban_sdk::Error::from((
-                soroban_sdk::xdr::ScErrorType::Contract,
-                soroban_sdk::xdr::ScErrorCode::InvalidAction,
-            )),
-            SavingsGoalsError::InsufficientBalance => soroban_sdk::Error::from((
-                soroban_sdk::xdr::ScErrorType::Contract,
-                soroban_sdk::xdr::ScErrorCode::InvalidInput,
-            )),
-            SavingsGoalsError::Overflow => soroban_sdk::Error::from((
-                soroban_sdk::xdr::ScErrorType::Contract,
-                soroban_sdk::xdr::ScErrorCode::InvalidInput,
-            )),
-        }
-    }
-}
 
-impl From<&SavingsGoalsError> for soroban_sdk::Error {
-    fn from(err: &SavingsGoalsError) -> Self {
-        (*err).into()
-    }
-}
-
-impl From<soroban_sdk::Error> for SavingsGoalsError {
-    fn from(_err: soroban_sdk::Error) -> Self {
-        SavingsGoalsError::Unauthorized
-    }
-}
 
 #[contracttype]
 #[derive(Clone)]
@@ -200,11 +149,13 @@ pub struct ContributionItem {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum SavingsGoalError {
-    GoalNotFound = 1,
-    InsufficientBalance = 2,
-    GoalLocked = 3,
-    Unauthorized = 4,
-    TargetAmountMustBePositive = 5,
+    InvalidAmount = 1,
+    GoalNotFound = 2,
+    Unauthorized = 3,
+    GoalLocked = 4,
+    InsufficientBalance = 5,
+    Overflow = 6,
+    TargetAmountMustBePositive = 7,
 }
 #[contract]
 pub struct SavingsGoalContract;
@@ -296,7 +247,7 @@ impl SavingsGoalContract {
 
     pub fn pause(env: Env, caller: Address) {
         caller.require_auth();
-        let admin = Self::get_pause_admin(&env).ok_or(SavingsGoalsError::Unauthorized).unwrap();
+        let admin = Self::get_pause_admin(&env).ok_or(SavingsGoalError::Unauthorized).unwrap();
         if admin != caller {
             panic!("Unauthorized");
         }
@@ -309,7 +260,7 @@ impl SavingsGoalContract {
 
     pub fn unpause(env: Env, caller: Address) {
         caller.require_auth();
-        let admin = Self::get_pause_admin(&env).ok_or(SavingsGoalsError::Unauthorized).unwrap();
+        let admin = Self::get_pause_admin(&env).ok_or(SavingsGoalError::Unauthorized).unwrap();
         if admin != caller {
             panic!("Unauthorized");
         }
@@ -329,7 +280,7 @@ impl SavingsGoalContract {
 
     pub fn pause_function(env: Env, caller: Address, func: Symbol) {
         caller.require_auth();
-        let admin = Self::get_pause_admin(&env).ok_or(SavingsGoalsError::Unauthorized).unwrap();
+        let admin = Self::get_pause_admin(&env).ok_or(SavingsGoalError::Unauthorized).unwrap();
         if admin != caller {
             panic!("Unauthorized");
         }
@@ -346,7 +297,7 @@ impl SavingsGoalContract {
 
     pub fn unpause_function(env: Env, caller: Address, func: Symbol) {
         caller.require_auth();
-        let admin = Self::get_pause_admin(&env).ok_or(SavingsGoalsError::Unauthorized).unwrap();
+        let admin = Self::get_pause_admin(&env).ok_or(SavingsGoalError::Unauthorized).unwrap();
         if admin != caller {
             panic!("Unauthorized");
         }
@@ -536,13 +487,13 @@ impl SavingsGoalContract {
         name: String,
         target_amount: i128,
         target_date: u64,
-    ) -> Result<u32, SavingsGoalsError> {
+    ) -> Result<u32, SavingsGoalError> {
         owner.require_auth();
         Self::require_not_paused(&env, pause_functions::CREATE_GOAL);
 
         if target_amount <= 0 {
             Self::append_audit(&env, symbol_short!("create"), &owner, false);
-            return Err(SavingsGoalsError::InvalidAmount);
+            return Err(SavingsGoalError::InvalidAmount);
         }
 
         Self::extend_instance_ttl(&env);
@@ -620,13 +571,13 @@ impl SavingsGoalContract {
         caller: Address,
         goal_id: u32,
         amount: i128,
-    ) -> Result<i128, SavingsGoalsError> {
+    ) -> Result<i128, SavingsGoalError> {
         caller.require_auth();
         Self::require_not_paused(&env, pause_functions::ADD_TO_GOAL);
 
         if amount <= 0 {
             Self::append_audit(&env, symbol_short!("add"), &caller, false);
-            return Err(SavingsGoalsError::InvalidAmount);
+            return Err(SavingsGoalError::InvalidAmount);
         }
 
         Self::extend_instance_ttl(&env);
@@ -641,7 +592,7 @@ impl SavingsGoalContract {
             Some(g) => g,
             None => {
                 Self::append_audit(&env, symbol_short!("add"), &caller, false);
-                return Err(SavingsGoalsError::GoalNotFound);
+                return Err(SavingsGoalError::GoalNotFound);
             }
         };
 
@@ -654,7 +605,7 @@ impl SavingsGoalContract {
         goal.current_amount = goal
             .current_amount
             .checked_add(amount)
-            .ok_or(SavingsGoalsError::Overflow)?;
+            .ok_or(SavingsGoalError::Overflow)?;
         let new_total = goal.current_amount;
         let was_completed = new_total >= goal.target_amount;
         let previously_completed = (new_total - amount) >= goal.target_amount;
@@ -813,13 +764,13 @@ impl SavingsGoalContract {
         caller: Address,
         goal_id: u32,
         amount: i128,
-    ) -> Result<i128, SavingsGoalsError> {
+    ) -> Result<i128, SavingsGoalError> {
         caller.require_auth();
         Self::require_not_paused(&env, pause_functions::WITHDRAW);
 
         if amount <= 0 {
             Self::append_audit(&env, symbol_short!("withdraw"), &caller, false);
-            return Err(SavingsGoalsError::InvalidAmount);
+            return Err(SavingsGoalError::InvalidAmount);
         }
 
         Self::extend_instance_ttl(&env);
@@ -834,37 +785,37 @@ impl SavingsGoalContract {
             Some(g) => g,
             None => {
                 Self::append_audit(&env, symbol_short!("withdraw"), &caller, false);
-                return Err(SavingsGoalsError::GoalNotFound);
+                return Err(SavingsGoalError::GoalNotFound);
             }
         };
 
         if goal.owner != caller {
             Self::append_audit(&env, symbol_short!("withdraw"), &caller, false);
-            return Err(SavingsGoalsError::Unauthorized);
+            return Err(SavingsGoalError::Unauthorized);
         }
 
         if goal.locked {
             Self::append_audit(&env, symbol_short!("withdraw"), &caller, false);
-            return Err(SavingsGoalsError::GoalLocked);
+            return Err(SavingsGoalError::GoalLocked);
         }
 
         if let Some(unlock_date) = goal.unlock_date {
             let current_time = env.ledger().timestamp();
             if current_time < unlock_date {
                 Self::append_audit(&env, symbol_short!("withdraw"), &caller, false);
-                return Err(SavingsGoalsError::GoalLocked);
+                return Err(SavingsGoalError::GoalLocked);
             }
         }
 
         if amount > goal.current_amount {
             Self::append_audit(&env, symbol_short!("withdraw"), &caller, false);
-            return Err(SavingsGoalsError::InsufficientBalance);
+            return Err(SavingsGoalError::InsufficientBalance);
         }
 
         goal.current_amount = goal
             .current_amount
             .checked_sub(amount)
-            .ok_or(SavingsGoalsError::Overflow)?;
+            .ok_or(SavingsGoalError::Overflow)?;
         let new_amount = goal.current_amount;
 
         goals.set(goal_id, goal);

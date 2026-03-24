@@ -2134,6 +2134,39 @@
                             }
                           ]
                         }
+                      },
+                      {
+                        "key": {
+                          "symbol": "STOR_STAT"
+                        },
+                        "val": {
+                          "map": [
+                            {
+                              "key": {
+                                "symbol": "active_reports"
+                              },
+                              "val": {
+                                "u32": 2
+                              }
+                            },
+                            {
+                              "key": {
+                                "symbol": "archived_reports"
+                              },
+                              "val": {
+                                "u32": 0
+                              }
+                            },
+                            {
+                              "key": {
+                                "symbol": "last_updated"
+                              },
+                              "val": {
+                                "u64": 1709424000
+                              }
+                            }
+                          ]
+                        }
                       }
                     ]
                   }
